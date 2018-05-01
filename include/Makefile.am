@@ -2,13 +2,23 @@
 ## The version.i file must be verified and generated or updated if the
 ## git commit id (called git version.i here) changed since the last build
 ## of lttng-tools.
+
+## If "bootstrap" and ".git" exists in the top source directory and the git
+## executable is available, get the current git version string in the form:
+##
+##  "latest_tag"(-"number_of_commits_on_top")(-g"latest_commit_hash")(-dirty)
 ##
 version.i:
 	$(AM_V_at)rm -f version.i.tmp; \
-	if test -r "$(top_srcdir)/.git" && \
+	if (test -r "$(top_srcdir)/bootstrap" && test -r "$(top_srcdir)/.git") && \
 			test -x "`which git 2>&1;true`"; then \
 		GIT_VERSION_STR="`cd "$(top_srcdir)" && git describe --tags --dirty`"; \
+		GIT_CURRENT_TAG="`cd "$(top_srcdir)" && git describe --tags --exact-match HEAD 2> /dev/null | $(GREP) "^v"`"; \
 		echo "#define GIT_VERSION \"$$GIT_VERSION_STR\"" > version.i.tmp; \
+		if ! $(GREP) -- "-dirty" version.i.tmp > /dev/null && \
+				test "x$$GIT_CURRENT_TAG" != "x"; then \
+			echo "#define GIT_VERSION \"\"" > version.i.tmp; \
+		fi; \
 	fi; \
 	if test ! -f version.i.tmp; then \
 		if test ! -f version.i; then \
@@ -22,12 +32,17 @@ version.i:
 	true
 
 ##
-## version.i is defined as a .PHONY file even if it's a real file as
-## we want our routine to be ran for each build.
+## version.i is defined as a .PHONY target even if it's a real file,
+## we want the target to be re-run on every make.
 ##
 .PHONY: version.i
 
 CLEANFILES = version.i.tmp
+
+##
+## Only clean "version.i" on dist-clean, we need to keep it on regular
+## clean when it's part of a dist tarball.
+##
 DISTCLEANFILES = version.i
 
 lttnginclude_HEADERS = \
