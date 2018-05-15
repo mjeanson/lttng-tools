@@ -5,7 +5,7 @@ SUBDIRS =
 # Make sure to always distribute all folders
 # since SUBDIRS is decided at configure time.
 DIST_SUBDIRS = lttng-consumerd lttng lttng-sessiond lttng-relayd \
-	       lttng-crash
+	       lttng-crash lttng-collectd
 
 if BUILD_BIN_LTTNG
 SUBDIRS += lttng
@@ -25,4 +25,8 @@ endif
 
 if BUILD_BIN_LTTNG_SESSIOND
 SUBDIRS += lttng-sessiond
+endif
+
+if BUILD_BIN_LTTNG_COLLECTD
+SUBDIRS += lttng-collectd
 endif

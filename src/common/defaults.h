@@ -128,6 +128,13 @@
 #define DEFAULT_GLOBAL_RELAY_HEALTH_UNIX_SOCK		DEFAULT_LTTNG_RUNDIR "/relayd/health-%d"
 #define DEFAULT_HOME_RELAY_HEALTH_UNIX_SOCK		DEFAULT_LTTNG_HOME_RUNDIR "/relayd/health-%d"
 
+/* Collectd path */
+#define DEFAULT_LTTNG_COLLECTD_FILE			"lttng-collectd"
+#define DEFAULT_LTTNG_COLLECTD_PIPE_FILE		"collectd"
+
+#define DEFAULT_LTTNG_COLLECTD_WAIT_TIMEOUT		10000    /* in milliseconds */
+#define DEFAULT_LTTNG_COLLECTD_MAGIC			0xC0
+
 /* Default daemon configuration file path */
 #define DEFAULT_SYSTEM_CONFIGPATH               CONFIG_LTTNG_SYSTEM_CONFIGDIR \
 	"/lttng"

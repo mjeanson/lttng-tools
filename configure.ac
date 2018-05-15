@@ -127,6 +127,7 @@ AS_CASE([$host_os],
       AS_IF([test "x$enable_bin_lttng_consumerd" = "x" ], [enable_bin_lttng_consumerd=no])
       AS_IF([test "x$enable_bin_lttng_crash" = "x" ], [enable_bin_lttng_crash=no])
       AS_IF([test "x$enable_bin_lttng_sessiond" = "x" ], [enable_bin_lttng_sessiond=no])
+      AS_IF([test "x$enable_bin_lttng_collectd" = "x" ], [enable_bin_lttng_collectd=no])
       AS_IF([test "x$enable_extras" = "x" ], [enable_extras=no])
       AS_IF([test "x$with_lttng_ust" = "x" ], [with_lttng_ust=no])
     ]
@@ -276,6 +277,13 @@ AC_ARG_WITH([sessiond-bin],
 	[SESSIOND_BIN=''])
 AC_SUBST([SESSIOND_BIN])
 
+AC_ARG_WITH([collectd-bin],
+	AS_HELP_STRING([--with-collectd-bin],
+	[Location of the collectd executable (including the filename)]),
+	[COLLECTD_BIN="$withval"],
+	[COLLECTD_BIN=''])
+AC_SUBST([COLLECTD_BIN])
+
 AC_ARG_WITH([lttng-system-rundir],
 	AS_HELP_STRING([--with-lttng-system-rundir],
 	[Location of the system directory where the system-wide lttng-sessiond runtime files are kept. The default is "/var/run/lttng".]),
@@ -309,6 +317,7 @@ AC_DEFINE_UNQUOTED([CONFIG_CONSUMERD64_LIBDIR], "$CONSUMERD64_LIBDIR", [Search f
 AC_DEFINE_UNQUOTED([CONFIG_BABELTRACE_BIN], "$BABELTRACE_BIN", [Location of the babeltrace viewer executable.])
 AC_DEFINE_UNQUOTED([CONFIG_LTTV_GUI_BIN], "$LTTV_GUI_BIN", [Location of the lttv GUI viewer executable.])
 AC_DEFINE_UNQUOTED([CONFIG_SESSIOND_BIN], "$SESSIOND_BIN", [Location of the sessiond executable.])
+AC_DEFINE_UNQUOTED([CONFIG_COLLECTD_BIN], "$COLLECTD_BIN", [Location of the collectd executable.])
 AC_DEFINE_UNQUOTED([CONFIG_LTTNG_SYSTEM_RUNDIR], ["$LTTNG_SYSTEM_RUNDIR"], [LTTng system runtime directory])
 
 AC_DEFUN([_AC_DEFINE_AND_SUBST], [
@@ -859,6 +868,8 @@ AC_ARG_ENABLE([bin-lttng-relayd], AS_HELP_STRING([--disable-bin-lttng-relayd],
 	      [Disable the build of lttng-relayd binaries]))
 AC_ARG_ENABLE([bin-lttng-sessiond], AS_HELP_STRING([--disable-bin-lttng-sessiond],
 	      [Disable the build of lttng-sessiond binaries]))
+AC_ARG_ENABLE([bin-lttng-collectd], AS_HELP_STRING([--disable-bin-lttng-collectd],
+	      [Disable the build of lttng-collectd binaries]))
 AC_ARG_ENABLE([extras], AS_HELP_STRING([--disable-extras],
 	      [Disable the build of the extra components]))
 
@@ -930,6 +941,11 @@ AS_IF([test x$enable_bin_lttng_sessiond != xno],
       ]
 )
 
+AS_IF([test x$enable_bin_lttng_collectd != xno],
+      # Do nothing since libconfig and libcommon are built by default.
+      []
+)
+
 # Libraries dependencies enabling
 AS_IF([test x$build_lib_lttng_ctl = xyes],
       [
@@ -969,6 +985,7 @@ AM_CONDITIONAL([BUILD_BIN_LTTNG_CONSUMERD], [test x$enable_bin_lttng_consumerd !
 AM_CONDITIONAL([BUILD_BIN_LTTNG_CRASH], [test x$enable_bin_lttng_crash != xno])
 AM_CONDITIONAL([BUILD_BIN_LTTNG_RELAYD], [test x$enable_bin_lttng_relayd != xno])
 AM_CONDITIONAL([BUILD_BIN_LTTNG_SESSIOND], [test x$enable_bin_lttng_sessiond != xno])
+AM_CONDITIONAL([BUILD_BIN_LTTNG_COLLECTD], [test x$enable_bin_lttng_collectd != xno])
 
 # Export the tests and extras build conditions.
 AS_IF([\
@@ -976,7 +993,8 @@ test "x$enable_bin_lttng" != "xno" && \
 test "x$enable_bin_lttng_consumerd" != "xno" && \
 test "x$enable_bin_lttng_crash" != "xno" && \
 test "x$enable_bin_lttng_relayd" != "xno" && \
-test "x$enable_bin_lttng_sessiond" != "xno"],
+test "x$enable_bin_lttng_sessiond" != "xno" && \
+test "x$enable_bin_lttng_collectd" != "xno"],
 [build_tests=yes],
 [build_tests=no]
 )
@@ -1054,6 +1072,7 @@ AC_CONFIG_FILES([
 	src/lib/lttng-ctl/filter/Makefile
 	src/lib/lttng-ctl/lttng-ctl.pc
 	src/bin/Makefile
+	src/bin/lttng-collectd/Makefile
 	src/bin/lttng-consumerd/Makefile
 	src/bin/lttng-sessiond/Makefile
 	src/bin/lttng-relayd/Makefile
@@ -1188,6 +1207,9 @@ PPRINT_PROP_BOOL([lttng-relayd], $value)
 test x$enable_bin_lttng_sessiond != xno && value=1 || value=0
 PPRINT_PROP_BOOL([lttng-sessiond], $value)
 
+test x$enable_bin_lttng_collectd != xno && value=1 || value=0
+PPRINT_PROP_BOOL([lttng-collectd], $value)
+
 # Extras
 test x$enable_extras != xno && value=1 || value=0
 AS_ECHO
@@ -1268,6 +1290,13 @@ AS_IF([test "$SESSIOND_BIN" = ""],[
 	path="$SESSIOND_BIN"
 ])
 PPRINT_PROP_STRING([lttng-sessiond executable], [$path])
+
+AS_IF([test "$COLLECTD_BIN" = ""],[
+	path="`eval eval echo $lttnglibexecdir`/lttng-collectd"
+],[
+	path="$COLLECTD_BIN"
+])
+PPRINT_PROP_STRING([lttng-collectd executable], [$path])
 
 AS_IF([test "$CONSUMERD32_BIN" = ""],[
 	path="`eval eval echo $lttnglibexecdir`/lttng-consumerd"

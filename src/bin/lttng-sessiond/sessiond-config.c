@@ -71,6 +71,9 @@ struct sessiond_config sessiond_config_build_defaults = {
 	.kconsumerd_path.value =		NULL,
 	.kconsumerd_err_unix_sock_path.value = 	NULL,
 	.kconsumerd_cmd_unix_sock_path.value = 	NULL,
+
+	.collectd_bin_path.value =		NULL,
+	.collectd_pipe_path.value =		NULL,
 };
 
 static
@@ -162,6 +165,12 @@ int sessiond_config_apply_env_config(struct sessiond_config *config)
 	env_value = lttng_secure_getenv(DEFAULT_LTTNG_EXTRA_KMOD_PROBES);
 	if (env_value) {
 		config_string_set_static(&config->kmod_extra_probes_list,
+				env_value);
+	}
+
+	env_value = lttng_secure_getenv("LTTNG_COLLECTD_BIN");
+	if (env_value) {
+		config_string_set_static(&config->collectd_bin_path,
 				env_value);
 	}
 end:
@@ -399,6 +408,19 @@ int sessiond_config_init(struct sessiond_config *config)
 #else
 #error "Unknown bitness"
 #endif
+
+	config_string_set_static(&config->collectd_bin_path,
+			INSTALL_BIN_PATH "/" DEFAULT_LTTNG_COLLECTD_FILE);
+
+	ret = asprintf(&str, "%s/%s", config->rundir.value,
+			DEFAULT_LTTNG_COLLECTD_PIPE_FILE);
+	if (ret < 0) {
+		ERR("Failed to set collectd named pipe path");
+		goto end;
+	}
+	config_string_set(&config->collectd_pipe_path, str);
+	str = NULL;
+
 	ret = 0;
 end:
 	return ret;
@@ -432,6 +454,8 @@ void sessiond_config_fini(struct sessiond_config *config)
 	config_string_fini(&config->kconsumerd_path);
 	config_string_fini(&config->kconsumerd_err_unix_sock_path);
 	config_string_fini(&config->kconsumerd_cmd_unix_sock_path);
+	config_string_fini(&config->collectd_bin_path);
+	config_string_fini(&config->collectd_pipe_path);
 }
 
 static
@@ -484,6 +508,8 @@ int sessiond_config_resolve_paths(struct sessiond_config *config)
 	RESOLVE_CHECK(&config->kconsumerd_path);
 	RESOLVE_CHECK(&config->kconsumerd_err_unix_sock_path);
 	RESOLVE_CHECK(&config->kconsumerd_cmd_unix_sock_path);
+	RESOLVE_CHECK(&config->collectd_bin_path);
+	RESOLVE_CHECK(&config->collectd_pipe_path);
 	return 0;
 }
 

@@ -79,6 +79,7 @@
 #include "ht-cleanup.h"
 #include "sessiond-config.h"
 #include "sessiond-timer.h"
+#include "collectd-thread.h"
 
 static const char *help_msg =
 #ifdef LTTNG_EMBED_HELP
@@ -87,6 +88,13 @@ static const char *help_msg =
 NULL
 #endif
 ;
+
+struct registration_thread_handle {
+	/*
+	 * To inform the collectd thread we are ready.
+	 */
+	sem_t *registration_thread_ready;
+};
 
 const char *progname;
 static pid_t ppid;          /* Parent PID for --sig-parent option */
@@ -167,6 +175,8 @@ static const struct option long_options[] = {
 	{ "load", required_argument, 0, 'l' },
 	{ "kmod-probes", required_argument, 0, '\0' },
 	{ "extra-kmod-probes", required_argument, 0, '\0' },
+	{ "collectd-path", required_argument, 0, '\0' },
+	{ "collectd-pipe", required_argument, 0, '\0' },
 	{ NULL, 0, 0, 0 }
 };
 
@@ -201,6 +211,7 @@ int apps_cmd_notify_pipe[2] = { -1, -1 };
 /* Pthread, Mutexes and Semaphores */
 static pthread_t apps_thread;
 static pthread_t apps_notify_thread;
+static pthread_t collectd_thread;
 static pthread_t reg_apps_thread;
 static pthread_t client_thread;
 static pthread_t kernel_thread;
@@ -291,6 +302,12 @@ struct load_session_thread_data *load_info;
 
 /* Notification thread handle. */
 struct notification_thread_handle *notification_thread_handle;
+
+/* Notification thread handle. */
+struct registration_thread_handle *registration_thread_handle;
+
+/* Collectd thread handle. */
+struct collectd_thread_handle *collectd_thread_handle;
 
 /* Rotation thread handle. */
 struct rotation_thread_handle *rotation_thread_handle;
@@ -632,6 +649,10 @@ static void sessiond_cleanup(void)
 
 	DBG("Removing directory %s", config.consumerd64_path.value);
 	(void) rmdir(config.consumerd64_path.value);
+
+	/* collectd */
+	DBG("Removing %s", config.collectd_pipe_path.value);
+	(void) unlink(config.collectd_pipe_path.value);
 
 	DBG("Cleaning up all sessions");
 
@@ -2082,11 +2103,38 @@ error_testpoint:
 	return NULL;
 }
 
+static void registration_thread_handle_destroy(
+		struct registration_thread_handle *handle)
+{
+	if (!handle) {
+		goto end;
+	}
+
+end:
+	free(handle);
+}
+
+static struct registration_thread_handle *registration_thread_handle_create(
+		sem_t *registration_thread_ready)
+{
+	struct registration_thread_handle *handle;
+
+	handle = zmalloc(sizeof(*handle));
+	if (!handle) {
+		goto end;
+	}
+
+	handle->registration_thread_ready = registration_thread_ready;
+end:
+	return handle;
+}
+
 /*
  * This thread manage application registration.
  */
 static void *thread_registration_apps(void *data)
 {
+	struct registration_thread_handle *handle = data;
 	int sock = -1, i, ret, pollfd, err = -1;
 	uint32_t revents, nb_fd;
 	struct lttng_poll_event events;
@@ -2097,6 +2145,11 @@ static void *thread_registration_apps(void *data)
 	struct ust_command *ust_cmd = NULL;
 
 	DBG("[thread] Manage application registration started");
+
+	if (!handle) {
+		ERR("[reg-apps-thread] Invalid thread context provided");
+		goto end;
+	}
 
 	health_register(health_sessiond, HEALTH_SESSIOND_TYPE_APP_REG);
 
@@ -2131,6 +2184,9 @@ static void *thread_registration_apps(void *data)
 			"Execution continues but there might be problem for already\n"
 			"running applications that wishes to register.");
 	}
+
+	/* Notify the collectd thread we are ready for app registration */
+	sem_post(handle->registration_thread_ready);
 
 	while (1) {
 		DBG("Accepting application registration");
@@ -2304,7 +2360,7 @@ error_testpoint:
 		ERR("Health error occurred in %s", __func__);
 	}
 	health_unregister(health_sessiond);
-
+end:
 	return NULL;
 }
 
@@ -5166,6 +5222,38 @@ static int set_option(int opt, const char *arg, const char *optname)
 				ret = -ENOMEM;
 			}
 		}
+	} else if (string_match(optname, "collectd-path")) {
+		if (!arg || *arg == '\0') {
+			ret = -EINVAL;
+			goto end;
+		}
+		if (lttng_is_setuid_setgid()) {
+			WARN("Getting '%s' argument from setuid/setgid binary refused for security reasons.",
+				"--collectd-path");
+		} else {
+			config_string_set(&config.collectd_bin_path,
+					strdup(arg));
+			if (!config.collectd_bin_path.value) {
+				PERROR("strdup");
+				ret = -ENOMEM;
+			}
+		}
+	} else if (string_match(optname, "collectd-pipe")) {
+		if (!arg || *arg == '\0') {
+			ret = -EINVAL;
+			goto end;
+		}
+		if (lttng_is_setuid_setgid()) {
+			WARN("Getting '%s' argument from setuid/setgid binary refused for security reasons.",
+				"--collectd-pipe");
+		} else {
+			config_string_set(&config.collectd_pipe_path,
+					strdup(arg));
+			if (!config.collectd_pipe_path.value) {
+				PERROR("strdup");
+				ret = -ENOMEM;
+			}
+		}
 	} else if (string_match(optname, "config") || opt == 'f') {
 		/* This is handled in set_options() thus silent skip. */
 		goto end;
@@ -5802,6 +5890,7 @@ int main(int argc, char **argv)
 	/* Queue of rotation jobs populated by the sessiond-timer. */
 	struct rotation_thread_timer_queue *rotation_timer_queue = NULL;
 	sem_t notification_thread_ready;
+	sem_t registration_thread_ready;
 
 	init_kernel_workarounds();
 
@@ -6290,9 +6379,25 @@ int main(int argc, char **argv)
 		goto exit_dispatch;
 	}
 
+	/*
+	 * The collectd thread needs the registration thread to be ready before
+	 * launching the collectd daemon, so we use this semaphore as
+	 * a rendez-vous point.
+	 */
+	sem_init(&registration_thread_ready, 0, 0);
+
+	registration_thread_handle = registration_thread_handle_create(
+			&registration_thread_ready);
+	if (!registration_thread_handle) {
+		retval = -1;
+		ERR("Failed to create registration thread shared data");
+		stop_threads();
+		goto exit_reg_apps;
+	}
+
 	/* Create thread to manage application registration. */
 	ret = pthread_create(&reg_apps_thread, default_pthread_attr(),
-			thread_registration_apps, (void *) NULL);
+			thread_registration_apps, registration_thread_handle);
 	if (ret) {
 		errno = ret;
 		PERROR("pthread_create registration");
@@ -6321,6 +6426,27 @@ int main(int argc, char **argv)
 		retval = -1;
 		stop_threads();
 		goto exit_apps_notify;
+	}
+
+	/* Create thread to manage lttng collectd */
+	collectd_thread_handle = collectd_thread_handle_create(
+			thread_quit_pipe[0],
+			&registration_thread_ready);
+	if (!collectd_thread_handle) {
+		retval = -1;
+		ERR("Failed to create collectd thread shared data");
+		stop_threads();
+		goto exit_collectd;
+	}
+
+	ret = pthread_create(&collectd_thread, default_pthread_attr(),
+			thread_manage_collectd, collectd_thread_handle);
+	if (ret) {
+		errno = ret;
+		PERROR("pthread_create collectd");
+		retval = -1;
+		stop_threads();
+		goto exit_collectd;
 	}
 
 	/* Create agent registration thread. */
@@ -6390,6 +6516,18 @@ exit_kernel:
 	}
 exit_agent_reg:
 
+	ret = pthread_join(collectd_thread, &status);
+	if (ret) {
+		errno = ret;
+		PERROR("pthread_join collectd");
+		retval = -1;
+	}
+exit_collectd:
+
+	if (collectd_thread_handle) {
+		collectd_thread_handle_destroy(collectd_thread_handle);
+	}
+
 	ret = pthread_join(apps_notify_thread, &status);
 	if (ret) {
 		errno = ret;
@@ -6413,6 +6551,11 @@ exit_apps:
 		retval = -1;
 	}
 exit_reg_apps:
+
+	sem_destroy(&registration_thread_ready);
+	if (registration_thread_handle) {
+		registration_thread_handle_destroy(registration_thread_handle);
+	}
 
 	/*
 	 * Join dispatch thread after joining reg_apps_thread to ensure

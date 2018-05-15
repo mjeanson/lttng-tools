@@ -39,12 +39,14 @@ lttng_sessiond_SOURCES = utils.c utils.h \
                        sessiond-config.h sessiond-config.c \
                        rotate.h rotate.c \
                        rotation-thread.h rotation-thread.c \
-                       sessiond-timer.c sessiond-timer.h
+                       sessiond-timer.c sessiond-timer.h \
+                       collectd-thread.h
 
 if HAVE_LIBLTTNG_UST_CTL
 lttng_sessiond_SOURCES += trace-ust.c ust-registry.c ust-app.c \
 			ust-consumer.c ust-consumer.h ust-thread.c \
-			ust-metadata.c ust-clock.h agent-thread.c agent-thread.h
+			ust-metadata.c ust-clock.h agent-thread.c agent-thread.h \
+			collectd-thread.c
 endif
 
 # Add main.c at the end for compile order

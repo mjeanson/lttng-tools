@@ -50,6 +50,7 @@ TAGS
 
 /src/bin/lttng-sessiond/lttng-sessiond
 /src/bin/lttng/lttng
+/src/bin/lttng-collectd/lttng-collectd
 /src/bin/lttng-consumerd/lttng-consumerd
 /src/bin/lttng-crash/lttng-crash
 /src/bin/lttng-relayd/lttng-relayd

@@ -88,6 +88,9 @@ struct sessiond_config {
 	struct config_string kconsumerd_path;
 	struct config_string kconsumerd_err_unix_sock_path;
 	struct config_string kconsumerd_cmd_unix_sock_path;
+
+	struct config_string collectd_bin_path;
+	struct config_string collectd_pipe_path;
 };
 
 /* Initialize the sessiond_config values to build-defaults. */
