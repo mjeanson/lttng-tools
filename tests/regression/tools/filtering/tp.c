@@ -1,5 +1,7 @@
 /*
- * Copyright (c) - 2012 David Goulet <dgoulet@efficios.com>
+ * Copyright (c) 2012 David Goulet <dgoulet@efficios.com>
+ *
+ * SPDX-License-Identifier: ???
  *
  * THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED OR
  * IMPLIED. ANY USE IS AT YOUR OWN RISK.

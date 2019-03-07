@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
 SUBDIRS = gen-ust-events \
 	  gen-ust-nevents \
 	  gen-ust-nevents-str \

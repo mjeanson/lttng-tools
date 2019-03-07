@@ -5,7 +5,9 @@
 #define _TRACEPOINT_TP_H
 
 /*
- * Copyright (C) 2011  Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+ * Copyright (C) 2011 Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+ *
+ * SPDX-License-Identifier: ???
  *
  * THIS MATERIAL IS PROVIDED AS IS, WITH ABSOLUTELY NO WARRANTY EXPRESSED
  * OR IMPLIED.  ANY USE IS AT YOUR OWN RISK.
