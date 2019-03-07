@@ -4,7 +4,7 @@ July 18, 2011
 
 * LGPLv2.1
 
-The library part is distributed under LGPLv2.1. See lgpl-2.1.txt for details.
+The library part is distributed under LGPLv2.1. See LICENSES/LGPL-2.1 for details.
 This applies to:
 
 -) include/lttng/*
@@ -25,4 +25,4 @@ required by the LGPL license.
 * GPLv2
 
 All remaining source code is distributed under the GPLv2 license. See
-gpl-2.0.txt for details. 
+LICENSES/GPL-2.0 for details.
