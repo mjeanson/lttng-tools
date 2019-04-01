@@ -51,7 +51,8 @@ TESTS += ust/before-after/test_before_after \
 	ust/blocking/test_blocking \
 	ust/multi-lib/test_multi_lib \
 	ust/rotation-destroy-flush/test_rotation_destroy_flush \
-	ust/namespaces/test_ns_contexts
+	ust/namespaces/test_ns_contexts \
+	ust/namespaces/test_ns_contexts_change
 endif # HAVE_LIBLTTNG_UST_CTL
 
 if PYTHON_BINDING
