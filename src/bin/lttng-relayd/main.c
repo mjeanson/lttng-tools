@@ -118,6 +118,9 @@ const char *progname;
 const char *tracing_group_name = DEFAULT_TRACING_GROUP;
 static int tracing_group_name_override;
 
+const char *pid_file_path;
+static int pid_file_created;
+
 const char * const config_section_name = "relayd";
 
 /*
@@ -173,6 +176,7 @@ static struct option long_options[] = {
 	{ "live-port", 1, 0, 'L', },
 	{ "daemonize", 0, 0, 'd', },
 	{ "background", 0, 0, 'b', },
+	{ "pid-file", 1, 0, 'p', },
 	{ "group", 1, 0, 'g', },
 	{ "help", 0, 0, 'h', },
 	{ "output", 1, 0, 'o', },
@@ -264,6 +268,18 @@ static int set_option(int opt, const char *arg, const char *optname)
 				goto end;
 			}
 			tracing_group_name_override = 1;
+		}
+		break;
+	case 'p':
+		if (lttng_is_setuid_setgid()) {
+			WARN("Getting '%s' argument from setuid/setgid binary refused for security reasons.",
+				"-p, --pid-file");
+		} else {
+			pid_file_path = utils_expand_path_keep_symlink(arg);
+			if (pid_file_path == NULL) {
+				ret = -1;
+				goto end;
+			}
 		}
 		break;
 	case 'h':
@@ -532,6 +548,11 @@ static void relayd_cleanup(void)
 	if (tracing_group_name_override) {
 		free((void *) tracing_group_name);
 	}
+
+	/* If we created a pid file, delete it. */
+	if (pid_file_path && CMM_LOAD_SHARED(pid_file_created)) {
+		(void) unlink(pid_file_path);
+	}
 }
 
 /*
@@ -668,12 +689,27 @@ static int set_signal_handler(void)
 	return ret;
 }
 
+/*
+ * Atomically substract one to 'lttng_relay_ready', once we reach 0, send
+ * SIGUSR1 to the parent process.
+ */
 void lttng_relay_notify_ready(void)
 {
-	/* Notify the parent of the fork() process that we are ready. */
-	if (opt_daemon || opt_background) {
-		if (uatomic_sub_return(&lttng_relay_ready, 1) == 0) {
+	/*
+	 * The last thread to reach this synchronization point will
+	 * handle readiness notification.
+	 */
+	if (uatomic_sub_return(&lttng_relay_ready, 1) == 0) {
+		/* Notify the parent process that we are ready. */
+		if (opt_daemon || opt_background) {
 			kill(child_ppid, SIGUSR1);
+		}
+
+		/* Create the pid file if it was configured. */
+		if (pid_file_path) {
+			if (!utils_create_pid_file(getpid(), pid_file_path)) {
+				CMM_STORE_SHARED(pid_file_created, 1);
+			}
 		}
 	}
 }

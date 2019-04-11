@@ -12,7 +12,7 @@ SYNOPSIS
 [verse]
 *lttng-relayd* [option:--background | option:--daemonize]
              [option:--control-port='URL'] [option:--data-port='URL'] [option:--live-port='URL']
-             [option:--output='PATH'] [option:-v | option:-vv | option:-vvv]
+             [option:--output='PATH'] [option:--pid-file='FILE_PATH'] [option:-v | option:-vv | option:-vvv]
 
 
 DESCRIPTION
@@ -110,6 +110,9 @@ option:-g 'GROUP', option:--group='GROUP'::
 
 option:-o 'PATH', option:--output='PATH'::
     Set base directory of written trace data to 'PATH'.
+
+option:-p 'FILE_PATH', option:--pid-file='FILE_PATH'::
+    Create a PID file in 'FILE_PATH' when ready to accept connections.
 +
 See the <<output-directory,Output directory>> section above for more
 information.
