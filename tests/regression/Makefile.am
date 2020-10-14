@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-SUBDIRS = tools kernel ust
+SUBDIRS = tools
 
 LOG_DRIVER_FLAGS = --merge --post-script $(top_srcdir)/tests/utils/warn_processes.sh
 LOG_DRIVER = env PGREP='$(PGREP)' AM_TAP_AWK='$(AWK)' $(SHELL) \
@@ -40,6 +40,12 @@ TESTS = tools/filtering/test_invalid_filter \
 	tools/clear/test_ust \
 	tools/clear/test_kernel \
 	tools/tracker/test_event_tracker
+
+if IS_LINUX
+SUBDIRS += kernel
+
+#TESTS += 
+endif
 
 if HAVE_LIBLTTNG_UST_CTL
 SUBDIRS += ust
