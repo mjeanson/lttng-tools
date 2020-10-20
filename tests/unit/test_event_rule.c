@@ -37,7 +37,13 @@ int lttng_opt_quiet = 1;
 int lttng_opt_verbose;
 int lttng_opt_mi;
 
-#define NUM_TESTS 187
+#ifdef __linux__
+#define UPROBE_NUM_TESTS 10
+#else
+#define UPROBE_NUM_TESTS 0
+#endif
+
+#define NUM_TESTS (177 + UPROBE_NUM_TESTS)
 
 struct tracepoint_test {
 	enum lttng_domain_type type;
@@ -225,6 +231,7 @@ static void test_event_rule_syscall(void)
 	lttng_event_rule_destroy(syscall_from_buffer);
 }
 
+#ifdef __linux__
 static void test_event_rule_uprobe(void)
 {
 	struct lttng_event_rule *uprobe = NULL;
@@ -305,6 +312,9 @@ end:
 	lttng_userspace_probe_location_destroy(probe_location);
 	lttng_userspace_probe_location_lookup_method_destroy(lookup_method);
 }
+#else
+static void test_event_rule_uprobe(void) {}
+#endif
 
 static void test_event_rule_kprobe_by_location(
 		const struct lttng_kernel_probe_location *location)
