@@ -368,7 +368,12 @@ int lttcomm_close_unix_sock(int sock)
 	/* Shutdown receptions and transmissions */
 	ret = shutdown(sock, SHUT_RDWR);
 	if (ret < 0) {
-		PERROR("shutdown");
+		/* The socket is already disconnected, don't error out. */
+		if (errno == ENOTCONN) {
+			ret = 0;
+		} else {
+			PERROR("shutdown");
+		}
 	}
 
 	closeret = close(sock);
