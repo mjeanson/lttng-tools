@@ -29,12 +29,12 @@ struct thread_notifiers {
  */
 static void *thread_application_notification(void *data)
 {
-	int i, ret, pollfd, err = -1;
+	int i, ret, err = -1;
 	ssize_t size_ret;
-	uint32_t revents, nb_fd;
+	uint32_t nb_fd;
 	struct lttng_poll_event events;
 	struct thread_notifiers *notifiers = data;
-	const int quit_pipe_read_fd = lttng_pipe_get_readfd(notifiers->quit_pipe);
+	const int thread_quit_pipe_fd = lttng_pipe_get_readfd(notifiers->quit_pipe);
 
 	DBG("[ust-thread] Manage application notify command");
 
@@ -62,7 +62,7 @@ static void *thread_application_notification(void *data)
 		goto error;
 	}
 
-	ret = lttng_poll_add(&events, quit_pipe_read_fd,
+	ret = lttng_poll_add(&events, thread_quit_pipe_fd,
 			LPOLLIN | LPOLLERR);
 	if (ret < 0) {
 		goto error;
@@ -96,14 +96,16 @@ restart:
 			health_code_update();
 
 			/* Fetch once the poll data */
-			revents = LTTNG_POLL_GETEV(&events, i);
-			pollfd = LTTNG_POLL_GETFD(&events, i);
+			const uint32_t revents = LTTNG_POLL_GETEV(&events, i);
+			const int pollfd = LTTNG_POLL_GETFD(&events, i);
 
 			/* Thread quit pipe has been closed. Killing thread. */
-			if (pollfd == quit_pipe_read_fd) {
+			if (pollfd == thread_quit_pipe_fd) {
 				err = 0;
 				goto exit;
-			} else if (pollfd == notifiers->apps_cmd_notify_pipe_read_fd) {
+			}
+
+			if (pollfd == notifiers->apps_cmd_notify_pipe_read_fd) {
 				/* Inspect the apps cmd pipe */
 				int sock;
 

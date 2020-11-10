@@ -935,20 +935,6 @@ error:
 	return ret;
 }
 
-/*
- * Check if the thread quit pipe was triggered.
- *
- * Return 1 if it was triggered else 0;
- */
-static int check_thread_quit_pipe(int fd, uint32_t events)
-{
-	if (fd == thread_quit_pipe[0] && (events & LPOLLIN)) {
-		return 1;
-	}
-
-	return 0;
-}
-
 static int create_sock(void *data, int *out_fd)
 {
 	int ret;
@@ -1078,8 +1064,8 @@ end:
  */
 static void *relay_thread_listener(void *data)
 {
-	int i, ret, pollfd, err = -1;
-	uint32_t revents, nb_fd;
+	int i, ret, err = -1;
+	uint32_t nb_fd;
 	struct lttng_poll_event events;
 	struct lttcomm_sock *control_sock, *data_sock;
 
@@ -1150,15 +1136,14 @@ restart:
 
 		DBG("Relay new connection received");
 		for (i = 0; i < nb_fd; i++) {
+			/* Fetch once the poll data */
+			const uint32_t revents = LTTNG_POLL_GETEV(&events, i);
+			const int pollfd = LTTNG_POLL_GETFD(&events, i);
+
 			health_code_update();
 
-			/* Fetch once the poll data */
-			revents = LTTNG_POLL_GETEV(&events, i);
-			pollfd = LTTNG_POLL_GETFD(&events, i);
-
 			/* Thread quit pipe has been closed. Killing thread. */
-			ret = check_thread_quit_pipe(pollfd, revents);
-			if (ret) {
+			if (pollfd == thread_quit_pipe[0]) {
 				err = 0;
 				goto exit;
 			}
@@ -3872,14 +3857,13 @@ restart:
 		 */
 		for (i = 0; i < nb_fd; i++) {
 			/* Fetch once the poll data */
-			uint32_t revents = LTTNG_POLL_GETEV(&events, i);
-			int pollfd = LTTNG_POLL_GETFD(&events, i);
+			const uint32_t revents = LTTNG_POLL_GETEV(&events, i);
+			const int pollfd = LTTNG_POLL_GETFD(&events, i);
 
 			health_code_update();
 
 			/* Thread quit pipe has been closed. Killing thread. */
-			ret = check_thread_quit_pipe(pollfd, revents);
-			if (ret) {
+			if (pollfd == thread_quit_pipe[0]) {
 				err = 0;
 				goto exit;
 			}

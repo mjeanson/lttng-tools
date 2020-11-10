@@ -50,11 +50,6 @@ int sessiond_init_thread_quit_pipe(void)
 	return __init_thread_quit_pipe(thread_quit_pipe);
 }
 
-int sessiond_check_thread_quit_pipe(int fd, uint32_t events)
-{
-	return (fd == thread_quit_pipe[0] && (events & LPOLLIN));
-}
-
 /*
  * Wait for a notification on the quit pipe (with a timeout).
  *
