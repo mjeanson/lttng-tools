@@ -336,13 +336,99 @@ void wait_until_thread_is_ready(struct thread_notifiers *notifiers)
 	DBG("Agent management thread is ready");
 }
 
+static int handle_agent_app_disconnect(struct lttng_poll_event *events,
+		struct agent_app *app, bool unpublish_app)
+{
+	const int ret = lttng_poll_del(events, app->sock->fd);
+
+	if (ret < 0) {
+		PERROR("Failed to remove agent application socket from poll set");
+	}
+
+	if (unpublish_app) {
+		/* RCU read side lock is assumed to be held by this function. */
+		agent_delete_app(app);
+	}
+
+	agent_destroy_app(app);
+	return ret;
+}
+
+static
+int handle_agent_app_register(struct lttng_poll_event *events,
+		struct lttcomm_sock *reg_sock)
+{
+	struct agent_app_id new_app_id;
+	struct agent_app *new_app = NULL;
+	struct lttcomm_sock *new_app_socket;
+	int new_app_socket_fd;
+	int ret;
+
+	ret = accept_agent_connection(reg_sock, &new_app_id, &new_app_socket);
+	if (ret < 0) {
+		/* Errors are already logged. */
+		ret = 0;
+		goto end;
+	}
+
+	/*
+	 * new_app_socket's ownership has been transferred to the new agent app.
+	 */
+	new_app = agent_create_app(new_app_id.pid, new_app_id.domain,
+			new_app_socket);
+	if (!new_app) {
+		new_app_socket->ops->close(new_app_socket);
+		ret = 0;
+		goto end;
+	}
+
+	new_app_socket_fd = new_app_socket->fd;
+	new_app_socket = NULL;
+
+	/*
+	 * Since this is a command socket (write then read), only add poll
+	 * error event to only detect shutdown.
+	 */
+	// FIXME: We added LPOLLIN, this comment is wrong.
+	ret = lttng_poll_add(events, new_app_socket_fd, LPOLLIN | LPOLLRDHUP);
+	if (ret < 0) {
+		agent_destroy_app(new_app);
+		ret = 0;
+		goto end;
+	}
+
+	/*
+	 * Prevent sessions from being modified while the agent application's
+	 * configuration is updated.
+	 */
+	session_lock_list();
+
+	/* Update the newly registered applications's configuration. */
+	update_agent_app(new_app);
+
+	ret = agent_send_registration_done(new_app);
+	if (ret < 0) {
+		ret = handle_agent_app_disconnect(events, new_app, false);
+		if (ret) {
+			goto error_unlock;
+		}
+	}
+
+	/* Publish the new agent app. */
+	agent_add_app(new_app);
+
+error_unlock:
+	session_unlock_list();
+end:
+	return ret;
+}
+
 /*
  * This thread manage application notify communication.
  */
 static void *thread_agent_management(void *data)
 {
-	int i, ret;
-	uint32_t nb_fd;
+	int i, ret, nb_fd;
 	struct lttng_poll_event events;
 	struct lttcomm_sock *reg_sock;
 	struct thread_notifiers *notifiers = data;
@@ -428,91 +514,36 @@ restart:
 			/* Thread quit pipe has been closed. Killing thread. */
 			if (pollfd == thread_quit_pipe_fd) {
 				goto exit;
-			}
-
-			/* Activity on the registration socket. */
-			if (revents & LPOLLIN) {
-				struct agent_app_id new_app_id;
-				struct agent_app *new_app = NULL;
-				struct lttcomm_sock *new_app_socket;
-				int new_app_socket_fd;
-
-				assert(pollfd == reg_sock->fd);
-
-				ret = accept_agent_connection(
-					reg_sock, &new_app_id, &new_app_socket);
-				if (ret < 0) {
-					/* Errors are already logged. */
-					continue;
-				}
-
-				/*
-				 * new_app_socket's ownership has been
-				 * transferred to the new agent app.
-				 */
-				new_app = agent_create_app(new_app_id.pid,
-						new_app_id.domain,
-						new_app_socket);
-				if (!new_app) {
-					new_app_socket->ops->close(
-							new_app_socket);
-					continue;
-				}
-				new_app_socket_fd = new_app_socket->fd;
-				new_app_socket = NULL;
-
-				/*
-				 * Since this is a command socket (write then
-				 * read), only add poll error event to only
-				 * detect shutdown.
-				 */
-				ret = lttng_poll_add(&events, new_app_socket_fd,
-						LPOLLRDHUP);
-				if (ret < 0) {
-					agent_destroy_app(new_app);
-					continue;
-				}
-
-				/*
-				 * Prevent sessions from being modified while
-				 * the agent application's configuration is
-				 * updated.
-				 */
-				session_lock_list();
-
-				/*
-				 * Update the newly registered applications's
-				 * configuration.
-				 */
-				update_agent_app(new_app);
-
-				ret = agent_send_registration_done(new_app);
-				if (ret < 0) {
-					agent_destroy_app(new_app);
-					/* Removing from the poll set. */
-					ret = lttng_poll_del(&events,
-							new_app_socket_fd);
+			} else if (pollfd == reg_sock->fd) {
+				/* Activity on the registration socket. */
+				if (revents & LPOLLIN) {
+					ret = handle_agent_app_register(&events,
+							reg_sock);
 					if (ret < 0) {
-						session_unlock_list();
 						goto error;
 					}
-					continue;
-				}
-
-				/* Publish the new agent app. */
-				agent_add_app(new_app);
-
-				session_unlock_list();
-			} else if (revents & (LPOLLERR | LPOLLHUP | LPOLLRDHUP)) {
-				/* Removing from the poll set */
-				ret = lttng_poll_del(&events, pollfd);
-				if (ret < 0) {
+				} else {
+					ERR("Unexpected poll events %u for sock %d", revents, pollfd);
 					goto error;
 				}
-				agent_destroy_app_by_sock(pollfd);
 			} else {
-				ERR("Unexpected poll events %u for sock %d", revents, pollfd);
-				goto error;
+				struct agent_app *app;
+
+				/*
+				 * An application has either sent an unsolicited
+				 * message (which would be a protocol error) or
+				 * it is disconnecting and we are receiving EOF.
+				 */
+				rcu_read_lock();
+				app = agent_find_app_by_sock(pollfd);
+				assert(app);
+
+				ret = handle_agent_app_disconnect(&events, app,
+						true);
+				rcu_read_unlock();
+				if (ret) {
+					goto error;
+				}
 			}
 		}
 	}
