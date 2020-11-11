@@ -3874,7 +3874,8 @@ restart:
 					struct relay_connection *conn;
 
 					ret = lttng_read(relay_conn_pipe[0], &conn, sizeof(conn));
-					if (ret < 0) {
+					if (ret <= 0) {
+						ERR("Relay connection pipe error");
 						goto error;
 					}
 					ret = lttng_poll_add(&events,
@@ -4011,6 +4012,10 @@ restart:
 			}
 			assert(data_conn->type == RELAY_DATA);
 
+			/*
+			 * Handle POLLIN even if LPOLLHUP might be set, a zero byte read in
+			 * relay_process_data() will detect EOF.
+			 */
 			if (revents & LPOLLIN) {
 				enum relay_connection_status status;
 

@@ -2448,7 +2448,8 @@ restart:
 
 					ret = lttng_read(live_conn_pipe[0],
 							&conn, sizeof(conn));
-					if (ret < 0) {
+					if (ret <= 0) {
+						ERR("Relay live pipe read error");
 						goto error;
 					}
 					ret = lttng_poll_add(&events,
@@ -2461,7 +2462,7 @@ restart:
 					connection_ht_add(viewer_connections_ht, conn);
 					DBG("Connection socket %d added to poll", conn->sock->fd);
 				} else if (revents & (LPOLLERR | LPOLLHUP | LPOLLRDHUP)) {
-					ERR("Relay live pipe error");
+					ERR("Relay live pipe poll error");
 					goto error;
 				} else {
 					ERR("Unexpected poll events %u for sock %d", revents, pollfd);
