@@ -2969,8 +2969,7 @@ restart:
 								&chan->wait_fd_node);
 						rcu_read_unlock();
 						/* Add channel to the global poll events list */
-						// FIXME: Empty flag on a pipe pollset, this might hang on FreeBSD.
-						lttng_poll_add(&events, chan->wait_fd, 0);
+						lttng_poll_add(&events, chan->wait_fd, LPOLLIN);
 						break;
 					case CONSUMER_CHANNEL_DEL:
 					{
