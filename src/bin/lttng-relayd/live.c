@@ -509,7 +509,7 @@ int create_named_thread_poll_set(struct lttng_poll_event *events,
 	}
 
 	/* Add quit pipe */
-	ret = lttng_poll_add(events, thread_quit_pipe[0], LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(events, thread_quit_pipe[0], LPOLLIN);
 	if (ret < 0) {
 		goto error;
 	}

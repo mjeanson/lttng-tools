@@ -106,8 +106,7 @@ static void sanitize_wait_queue(struct ust_reg_wait_queue *wait_queue)
 	cds_list_for_each_entry_safe(wait_node, tmp_wait_node,
 			&wait_queue->head, head) {
 		assert(wait_node->app);
-		ret = lttng_poll_add(&events, wait_node->app->sock,
-				LPOLLHUP | LPOLLERR);
+		ret = lttng_poll_add(&events, wait_node->app->sock, LPOLLIN);
 		if (ret < 0) {
 			goto error;
 		}

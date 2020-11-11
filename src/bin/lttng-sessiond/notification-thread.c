@@ -277,28 +277,24 @@ int init_poll_set(struct lttng_poll_event *poll_set,
 		goto end;
 	}
 
-	ret = lttng_poll_add(poll_set, notification_channel_socket,
-			LPOLLIN | LPOLLERR | LPOLLHUP | LPOLLRDHUP);
+	ret = lttng_poll_add(poll_set, notification_channel_socket, LPOLLIN | LPOLLRDHUP);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add notification channel socket to pollset");
 		goto error;
 	}
-	ret = lttng_poll_add(poll_set, lttng_pipe_get_readfd(handle->cmd_queue.event_pipe),
-			LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(poll_set, lttng_pipe_get_readfd(handle->cmd_queue.event_pipe), LPOLLIN);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add notification command queue event fd to pollset");
 		goto error;
 	}
 	ret = lttng_poll_add(poll_set,
-			handle->channel_monitoring_pipes.ust32_consumer,
-			LPOLLIN | LPOLLERR);
+			handle->channel_monitoring_pipes.ust32_consumer, LPOLLIN);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add ust-32 channel monitoring pipe fd to pollset");
 		goto error;
 	}
 	ret = lttng_poll_add(poll_set,
-			handle->channel_monitoring_pipes.ust64_consumer,
-			LPOLLIN | LPOLLERR);
+			handle->channel_monitoring_pipes.ust64_consumer, LPOLLIN);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add ust-64 channel monitoring pipe fd to pollset");
 		goto error;
@@ -307,8 +303,7 @@ int init_poll_set(struct lttng_poll_event *poll_set,
 		goto end;
 	}
 	ret = lttng_poll_add(poll_set,
-			handle->channel_monitoring_pipes.kernel_consumer,
-			LPOLLIN | LPOLLERR);
+			handle->channel_monitoring_pipes.kernel_consumer, LPOLLIN);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add kernel channel monitoring pipe fd to pollset");
 		goto error;

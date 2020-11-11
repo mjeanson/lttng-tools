@@ -43,9 +43,6 @@
 #include "lttng-sessiond.h"
 #include "kernel.h"
 
-#define CLIENT_POLL_MASK_IN (LPOLLIN | LPOLLERR | LPOLLHUP | LPOLLRDHUP)
-#define CLIENT_POLL_MASK_IN_OUT (CLIENT_POLL_MASK_IN | LPOLLOUT)
-
 enum lttng_object_type {
 	LTTNG_OBJECT_TYPE_UNKNOWN,
 	LTTNG_OBJECT_TYPE_NONE,
@@ -2921,9 +2918,7 @@ int handle_notification_thread_client_connect(
 		goto error;
 	}
 
-	ret = lttng_poll_add(&state->events, client->socket,
-			LPOLLIN | LPOLLERR |
-			LPOLLHUP | LPOLLRDHUP);
+	ret = lttng_poll_add(&state->events, client->socket, LPOLLIN | LPOLLRDHUP);
 	if (ret < 0) {
 		ERR("[notification-thread] Failed to add notification channel client socket to poll set");
 		ret = 0;
@@ -3066,7 +3061,7 @@ int client_handle_transmission_status(
 	switch (transmission_status) {
 	case CLIENT_TRANSMISSION_STATUS_COMPLETE:
 		ret = lttng_poll_mod(&state->events, client->socket,
-				CLIENT_POLL_MASK_IN);
+				LPOLLIN | LPOLLRDHUP);
 		if (ret) {
 			goto end;
 		}
@@ -3078,7 +3073,7 @@ int client_handle_transmission_status(
 		 * available to send the rest of the payload.
 		 */
 		ret = lttng_poll_mod(&state->events, client->socket,
-				CLIENT_POLL_MASK_IN_OUT);
+				LPOLLIN | LPOLLRDHUP | LPOLLOUT);
 		if (ret) {
 			goto end;
 		}

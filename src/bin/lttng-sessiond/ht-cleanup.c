@@ -64,13 +64,12 @@ static int set_pollset(struct lttng_poll_event *events, size_t size)
 		goto error;
 	}
 
-	ret = lttng_poll_add(events, ht_cleanup_quit_pipe[0],
-			LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(events, ht_cleanup_quit_pipe[0], LPOLLIN);
 	if (ret < 0) {
 		goto error;
 	}
 
-	ret = lttng_poll_add(events, ht_cleanup_pipe[0], LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(events, ht_cleanup_pipe[0], LPOLLIN);
 	if (ret < 0) {
 		DBG("[ht-thread] lttng_poll_add error %d.", ret);
 		goto error;

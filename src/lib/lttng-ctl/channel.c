@@ -259,7 +259,7 @@ lttng_notification_channel_get_next_notification(
 		status = LTTNG_NOTIFICATION_CHANNEL_STATUS_ERROR;
 		goto end_unlock;
 	}
-	ret = lttng_poll_add(&events, channel->socket, LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(&events, channel->socket, LPOLLIN);
 	if (ret < 0) {
 		status = LTTNG_NOTIFICATION_CHANNEL_STATUS_ERROR;
 		goto end_clean_poll;
@@ -439,7 +439,7 @@ lttng_notification_channel_has_pending_notification(
 		status = LTTNG_NOTIFICATION_CHANNEL_STATUS_ERROR;
 		goto end_unlock;
 	}
-	ret = lttng_poll_add(&events, channel->socket, LPOLLIN | LPOLLERR);
+	ret = lttng_poll_add(&events, channel->socket, LPOLLIN);
 	if (ret < 0) {
 		status = LTTNG_NOTIFICATION_CHANNEL_STATUS_ERROR;
 		goto end_clean_poll;
