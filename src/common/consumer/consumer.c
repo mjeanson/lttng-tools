@@ -2414,30 +2414,8 @@ restart:
 			stream = caa_container_of(node, struct lttng_consumer_stream,
 					node);
 
-			if (revents & (LPOLLIN | LPOLLPRI)) {
-				/* Get the data out of the metadata file descriptor */
-				DBG("Metadata available on fd %d", pollfd);
-				assert(stream->wait_fd == pollfd);
-
-				do {
-					health_code_update();
-
-					len = ctx->on_buffer_ready(stream, ctx, false);
-					/*
-					 * We don't check the return value here since if we get
-					 * a negative len, it means an error occurred thus we
-					 * simply remove it from the poll set and free the
-					 * stream.
-					 */
-				} while (len > 0);
-
-				/* It's ok to have an unavailable sub-buffer */
-				if (len < 0 && len != -EAGAIN && len != -ENODATA) {
-					/* Clean up stream from consumer and free it. */
-					lttng_poll_del(&events, stream->wait_fd);
-					consumer_del_metadata_stream(stream, metadata_ht);
-				}
-			} else if (revents & (LPOLLERR | LPOLLHUP)) {
+			// FIXME: Handle error flags first since LPOLLIN can be enabled with LPOLLHUP
+			if (revents & (LPOLLERR | LPOLLHUP)) {
 				DBG("Metadata fd %d is hup|err.", pollfd);
 				if (!stream->hangup_flush_done
 						&& (consumer_data.type == LTTNG_CONSUMER32_UST
@@ -2465,6 +2443,32 @@ restart:
 				 * and securely free the stream.
 				 */
 				consumer_del_metadata_stream(stream, metadata_ht);
+			} else if (revents & (LPOLLIN | LPOLLPRI)) {
+				/* Get the data out of the metadata file descriptor */
+				DBG("Metadata available on fd %d", pollfd);
+				assert(stream->wait_fd == pollfd);
+
+				do {
+					health_code_update();
+
+					len = ctx->on_buffer_ready(stream, ctx, false);
+					/*
+					 * We don't check the return value here since if we get
+					 * a negative len, it means an error occurred thus we
+					 * simply remove it from the poll set and free the
+					 * stream.
+					 */
+				} while (len > 0);
+
+				/* It's ok to have an unavailable sub-buffer */
+				if (len < 0 && len != -EAGAIN && len != -ENODATA) {
+					lttng_poll_del(&events, stream->wait_fd);
+					/*
+					 * This call update the channel states, closes file descriptors
+					 * and securely free the stream.
+					 */
+					consumer_del_metadata_stream(stream, metadata_ht);
+				}
 			} else {
 				ERR("Unexpected poll events %u for sock %d", revents, pollfd);
 				rcu_read_unlock();
