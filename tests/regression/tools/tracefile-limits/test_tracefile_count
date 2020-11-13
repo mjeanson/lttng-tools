@@ -17,15 +17,15 @@ TESTAPP_BIN="$TESTAPP_PATH/$TESTAPP_NAME/$TESTAPP_NAME"
 STATS_BIN="$TESTDIR/utils/babelstats.pl"
 NUM_TESTS=74
 
-NUM_CPUS=$(nproc)
-PAGE_SIZE=$(getconf PAGE_SIZE)
-TRACEFILE_SIZE=$PAGE_SIZE
-
 source "$TESTDIR"/utils/utils.sh
 
 if [ ! -x "$TESTAPP_BIN" ]; then
 	BAIL_OUT "No UST events binary detected."
 fi
+
+num_cpus=$(conf_proc_count)
+page_size=$(getconf PAGE_SIZE)
+tracefile_size=$page_size
 
 function enable_lttng_channel_count_limit ()
 {
@@ -39,8 +39,8 @@ function enable_lttng_channel_count_limit ()
 
 	"$TESTDIR"/../src/bin/lttng/"$LTTNG_BIN" enable-channel \
 	    -u "$channel_name" -s "$sess_name" \
-	    --subbuf-size "$PAGE_SIZE" \
-	    --tracefile-size "$TRACEFILE_SIZE" \
+	    --subbuf-size "$page_size" \
+	    --tracefile-size "$tracefile_size" \
 	    --tracefile-count "$tracefile_count_limit" >/dev/null 2>&1
 
 	ok $? "$test_name"
@@ -61,30 +61,36 @@ function get_total_stream_file_size ()
 {
 	local trace_path="$1"
 	local stream_name_pattern="$2"
-	local size
 
-	size=$(find "$trace_path" -type f -regex "$stream_name_pattern" -exec du -b -c {} + | tail -n1 | cut -f 1)
-	echo "$size"
+	local file_size
+	local total_size=0
+
+	# Use 'wc' to get the file size in bytes, it's unfortunatly the most
+	# portable way.
+	while IFS= read -r -d '' line; do
+		file_size=$(wc -c <"$line")
+		total_size=$(( total_size + file_size ))
+	done < <(find "$trace_path" -type f -regex "$stream_pattern" -print0)
+
+	echo $total_size
 }
 
 function get_stream_file_count ()
 {
 	local trace_path="$1"
 	local stream_name_pattern="$2"
-	local count
 
-	count=$(find "$trace_path" -type f -regex "$stream_name_pattern" | wc -l)
-	echo "$count"
+	find "$trace_path" -type f -regex "$stream_name_pattern" | wc -l
 }
 
 function test_tracefile_count_limit ()
 {
 	local count_limit="$1"
 
-	local channel_name="channel"
-	local cpuno=$((RANDOM % NUM_CPUS))
+	local channel_name="chan1"
+	local cpuno=$((RANDOM % num_cpus))
 	local event_name="tp:tptest"
-	local expected_size=$((count_limit * TRACEFILE_SIZE))
+	local expected_size=$((count_limit * tracefile_size))
 	local num_iter=100000
 	local previous_stream_size=-1
 	local session_name
@@ -92,7 +98,7 @@ function test_tracefile_count_limit ()
 	local stream_size=0
 	local trace_path
 
-	session_name=$(randstring 16 0)
+	session_name="count_limit_${count_limit}"
 	trace_path=$(mktemp -d)
 
 	diag "Test tracefile count limit : CPU $cpuno, $count_limit tracefiles, expecting a maximum of $expected_size bytes per CPU"
@@ -114,12 +120,13 @@ function test_tracefile_count_limit ()
 	# in stream size.
 	while [ "$stream_size" -ne "$previous_stream_size" ]; do
 		start_lttng_tracing_notap "$session_name"
-		taskset -c "$cpuno" "$TESTAPP_BIN" -i "$num_iter" >/dev/null 2>&1
+		# TODO: Switch between taskset and cpuset for Linux and FreeBSD
+		cpuset -l "$cpuno" "$TESTAPP_BIN" -i "$num_iter" >/dev/null 2>&1
 		stop_lttng_tracing_notap "$session_name"
 
 		previous_stream_size="$stream_size"
 		stream_size=$(get_total_stream_file_size "$trace_path" "$stream_pattern")
-		diag "Completed an iteration: previous size = $previous_stream_size bytes, new size = $stream_size bytes"
+		diag "Completed an iteration: previous size = '$previous_stream_size' bytes, new size = '$stream_size' bytes"
 
 		if [ "$stream_size" -gt "$expected_size" ]; then
 			diag "Total size for CPU $cpuno exceeds expected size: stream size = $stream_size bytes, expected size = $expected_size"
