@@ -153,17 +153,18 @@ static const char * const config_section_name = "sessiond";
 static int is_root;
 
 /*
- * Stop all threads by closing the thread quit pipe.
+ * Notify the main thread to initiate the threads teardown by closing the main
+ * quit pipe.
  */
-static void stop_threads(void)
+static void notify_main_quit_pipe(void)
 {
 	int ret;
 
 	/* Stopping all threads */
-	DBG("Terminating all threads");
-	ret = sessiond_notify_quit_pipe();
+	DBG("Notify the main thread to terminate all threads");
+	ret = sessiond_notify_main_quit_pipe();
 	if (ret < 0) {
-		ERR("write error on thread quit pipe");
+		ERR("write error on main quit pipe");
 	}
 }
 
@@ -268,10 +269,12 @@ static void sessiond_cleanup(void)
 	DBG("Cleanup sessiond");
 
 	/*
-	 * Close the thread quit pipe. It has already done its job,
+	 * Close the main thread quit pipe. It has already done its job,
 	 * since we are now called.
 	 */
-	sessiond_close_quit_pipe();
+	sessiond_close_main_quit_pipe();
+
+	/* Close all other pipes. */
 	utils_close_pipe(apps_cmd_pipe);
 	utils_close_pipe(apps_cmd_notify_pipe);
 	utils_close_pipe(kernel_poll_pipe);
@@ -1103,11 +1106,11 @@ static void sighandler(int sig)
 	switch (sig) {
 	case SIGINT:
 		DBG("SIGINT caught");
-		stop_threads();
+		notify_main_quit_pipe();
 		break;
 	case SIGTERM:
 		DBG("SIGTERM caught");
-		stop_threads();
+		notify_main_quit_pipe();
 		break;
 	case SIGUSR1:
 		CMM_STORE_SHARED(recv_child_signal, 1);
@@ -1450,8 +1453,8 @@ int main(int argc, char **argv)
 		goto stop_threads;
 	}
 
-	/* Create thread quit pipe */
-	if (sessiond_init_thread_quit_pipe()) {
+	/* Create main thread quit pipe */
+	if (sessiond_init_main_quit_pipe()) {
 		retval = -1;
 		goto stop_threads;
 	}
@@ -1664,7 +1667,6 @@ int main(int argc, char **argv)
 	if (!rotation_thread_handle) {
 		retval = -1;
 		ERR("Failed to create rotation thread shared data");
-		stop_threads();
 		goto stop_threads;
 	}
 
@@ -1745,10 +1747,12 @@ int main(int argc, char **argv)
 	 * signal that asks threads to teardown).
 	 */
 
-	/* Initiate teardown once activity occurs on the quit pipe. */
-	sessiond_wait_for_quit_pipe(-1);
+	/* Initiate teardown once activity occurs on the main quit pipe. */
+	sessiond_wait_for_main_quit_pipe(-1);
 
 stop_threads:
+	DBG("Terminating all threads");
+
 	/*
 	 * Ensure that the client thread is no longer accepting new commands,
 	 * which could cause new sessions to be created.
