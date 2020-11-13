@@ -156,8 +156,10 @@ function validate_kernel_version ()
 #  $2 = include special characters; 1 = yes, 0 = no; defaults to yes
 function randstring()
 {
+	local len="${1:-16}"
+
 	[ "$2" == "0" ] && CHAR="[:alnum:]" || CHAR="[:graph:]"
-	cat /dev/urandom 2>/dev/null | tr -cd "$CHAR" 2>/dev/null | head -c ${1:-16} 2>/dev/null
+	LC_CTYPE=C tr -cd "$CHAR" < /dev/urandom 2>/dev/null | head -c "$len" 2>/dev/null
 	echo
 }
 
