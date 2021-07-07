@@ -29,18 +29,6 @@ TESTS = tools/base-path/test_ust \
 	tools/crash/test_crash \
 	tools/regen-metadata/test_ust \
 	tools/regen-statedump/test_ust \
-	tools/notification/test_notification_ust_error \
-	tools/notification/test_notification_ust_buffer_usage \
-	tools/notification/test_notification_ust_capture \
-	tools/notification/test_notification_ust_event_rule_condition_exclusion \
-	tools/notification/test_notification_kernel_error \
-	tools/notification/test_notification_kernel_buffer_usage \
-	tools/notification/test_notification_kernel_capture \
-	tools/notification/test_notification_kernel_instrumentation \
-	tools/notification/test_notification_kernel_syscall \
-	tools/notification/test_notification_notifier_discarded_count \
-	tools/notification/test_notification_kernel_userspace_probe \
-	tools/notification/test_notification_multi_app \
 	tools/rotation/test_ust \
 	tools/rotation/test_kernel \
 	tools/rotation/test_save_load_mi \
@@ -48,13 +36,7 @@ TESTS = tools/base-path/test_ust \
 	tools/metadata/test_kernel \
 	tools/working-directory/test_relayd_working_directory \
 	tools/clear/test_ust \
-	tools/clear/test_kernel \
-	tools/tracker/test_event_tracker \
-	tools/trigger/start-stop/test_start_stop \
-	tools/trigger/test_add_trigger_cli \
-	tools/trigger/test_list_triggers_cli \
-	tools/trigger/test_remove_trigger_cli \
-	tools/trigger/name/test_trigger_name_backwards_compat
+	tools/clear/test_kernel
 
 if HAVE_LIBLTTNG_UST_CTL
 SUBDIRS += ust
@@ -75,8 +57,7 @@ TESTS += ust/before-after/test_before_after \
 	ust/multi-lib/test_multi_lib \
 	ust/rotation-destroy-flush/test_rotation_destroy_flush \
 	tools/metadata/test_ust \
-	tools/relayd-grouping/test_ust \
-	tools/trigger/rate-policy/test_ust_rate_policy
+	tools/relayd-grouping/test_ust
 
 if IS_LINUX
 TESTS += \
