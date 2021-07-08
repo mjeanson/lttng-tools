@@ -29,6 +29,9 @@ TESTS = tools/base-path/test_ust \
 	tools/crash/test_crash \
 	tools/regen-metadata/test_ust \
 	tools/regen-statedump/test_ust \
+	tools/notification/test_notification_ust_buffer_usage \
+	tools/notification/test_notification_kernel_buffer_usage \
+	tools/notification/test_notification_multi_app \
 	tools/rotation/test_ust \
 	tools/rotation/test_kernel \
 	tools/rotation/test_save_load_mi \
