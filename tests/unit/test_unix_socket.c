@@ -19,13 +19,14 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define HIGH_FD_COUNT LTTCOMM_MAX_SEND_FDS
 #define MESSAGE_COUNT 4
 #define LARGE_PAYLOAD_SIZE 4 * 1024
 #define LARGE_PAYLOAD_RECV_SIZE	100
 
-static const int TEST_COUNT = 33;
+static const int TEST_COUNT = 37;
 
 /* For error.h */
 int lttng_opt_quiet;
@@ -499,6 +500,99 @@ error:
 	lttng_payload_reset(&received_payload);
 }
 
+static
+void test_creds_passing(void)
+{
+	int sockets[2] = {-1, -1}, i;
+	pid_t fork_ret = -1;
+	int ret;
+	ssize_t sock_ret;
+	struct expected_creds {
+		uid_t euid;
+		gid_t egid;
+		pid_t pid;
+	} expected_creds;
+
+	diag("Receive peer's effective uid, effective gid, and pid from a unix socket");
+
+	ret = lttcomm_create_anon_unix_socketpair(sockets);
+	ok(ret == 0, "Created anonymous unix socket pair");
+	if (ret < 0) {
+		PERROR("Failed to create an anonymous pair of unix sockets");
+		goto error;
+	}
+
+	for (i = 0; i < 2; i++) {
+		ret = lttcomm_setsockopt_creds_unix_sock(sockets[i]);
+		if (ret) {
+			PERROR("Failed to set SO_PASSCRED on unix socket");
+			goto error;
+		}
+	}
+
+	fork_ret = fork();
+	if (fork_ret < 0) {
+		PERROR("Failed to fork");
+		goto error;
+	}
+
+	if (fork_ret == 0) {
+		/* Child. */
+		expected_creds = (struct expected_creds){
+			.euid = geteuid(),
+			.egid = getegid(),
+			.pid = getpid(),
+		};
+
+		sock_ret = lttcomm_send_creds_unix_sock(sockets[1], &expected_creds,
+				sizeof(expected_creds));
+		if (sock_ret < 0) {
+			PERROR("Failed to send expected credentials");
+		}
+	} else {
+		/* Parent. */
+		int child_status;
+		pid_t wait_pid_ret;
+		lttng_sock_cred received_creds = {};
+
+		sock_ret = lttcomm_recv_creds_unix_sock(sockets[0], &expected_creds,
+				sizeof(expected_creds), &received_creds);
+		if (sock_ret < 0) {
+			PERROR("Failed to receive credentials");
+			goto error;
+		}
+
+		wait_pid_ret = waitpid(fork_ret, &child_status, 0);
+		if (wait_pid_ret == -1) {
+			PERROR("Failed to wait for termination of child process");
+			goto error;
+		}
+		if (!WIFEXITED(child_status) || WEXITSTATUS(child_status)) {
+			diag("Child process reported an error, test failed");
+			goto error;
+		}
+
+		ok(expected_creds.euid == received_creds.uid, "Received the expected effective uid (%d == %d)", expected_creds.euid, received_creds.uid);
+		ok(expected_creds.egid == received_creds.gid, "Received the expected effective gid (%d == %d)", expected_creds.egid, received_creds.gid);
+		ok(expected_creds.pid == received_creds.pid, "Received the expected pid (%d == %d)", expected_creds.pid, received_creds.pid);
+	}
+error:
+	for (i = 0; i < 2; i++) {
+		if (sockets[i] < 0) {
+			continue;
+		}
+
+		if (close(sockets[i])) {
+			PERROR("Failed to close unix socket");
+		}
+	}
+
+	if (fork_ret == 0) {
+		/* Child exits at the end of this test. */
+		exit(0);
+	}
+}
+
 int main(void)
 {
 	plan_tests(TEST_COUNT);
@@ -506,6 +600,7 @@ int main(void)
 	test_high_fd_count(HIGH_FD_COUNT);
 	test_one_fd_per_message(MESSAGE_COUNT);
 	test_receive_in_chunks(LARGE_PAYLOAD_SIZE, LARGE_PAYLOAD_RECV_SIZE);
+	test_creds_passing();
 
 	return exit_status();
 }
