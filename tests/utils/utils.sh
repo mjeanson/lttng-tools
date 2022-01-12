@@ -159,6 +159,20 @@ function validate_lttng_modules_present ()
 	BAIL_OUT "LTTng modules not detected."
 }
 
+# Run the lttng binary.
+#
+# The first two arguments are stdout and stderr redirect paths, respectively.
+# The rest of the arguments are forwarded to the lttng binary
+function _run_lttng_cmd
+{
+	local stdout_dest="$1"
+	local stderr_dest="$2"
+	shift 2
+
+	diag "$TESTDIR/../src/bin/lttng/$LTTNG_BIN $*"
+	$TESTDIR/../src/bin/lttng/$LTTNG_BIN "$@" 1> "$stdout_dest" 2> "$stderr_dest"
+}
+
 function enable_kernel_lttng_event
 {
 	local withtap="$1"

@@ -49,8 +49,6 @@ TESTS += ust/before-after/test_before_after \
 	ust/multi-session/test_multi_session \
 	ust/nprocesses/test_nprocesses \
 	ust/overlap/test_overlap \
-	ust/java-jul/test_java_jul \
-	ust/java-log4j/test_java_log4j \
 	ust/python-logging/test_python_logging \
 	ust/getcpu-override/test_getcpu_override \
 	ust/clock-override/test_clock_override \
@@ -65,6 +63,18 @@ TESTS += ust/before-after/test_before_after \
 	tools/metadata/test_ust \
 	tools/relayd-grouping/test_ust
 endif # HAVE_LIBLTTNG_UST_CTL
+
+if TEST_JAVA_JUL_AGENT
+TESTS += ust/java-jul/test_java_jul
+endif # TEST_JAVA_JUL_AGENT
+
+if TEST_JAVA_LOG4J_AGENT
+TESTS += ust/java-log4j/test_java_log4j
+endif # TEST_JAVA_LOG4J_AGENT
+
+if TEST_JAVA_LOG4J2_AGENT
+TESTS += ust/java-log4j2/test_java_log4j2
+endif # TEST_JAVA_LOG4J2_AGENT
 
 if PYTHON_BINDING
 TESTS += ust/linking/test_linking \
