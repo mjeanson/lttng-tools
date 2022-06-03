@@ -343,14 +343,36 @@ static void *thread_dispatch_ust_registration(void *data)
 				cds_list_for_each_entry_safe(wait_node, tmp_wait_node,
 						&wait_queue.head, head) {
 					health_code_update();
-					if (wait_node->app->pid == ust_cmd->reg_msg.pid) {
+					/*
+					 * Only using the pid number to match
+					 * notify socket is not enough when
+					 * dealing with multiple instances of
+					 * lttng-ust for a given process. A
+					 * similar problem will rise up when
+					 * dealing with multiple similar pid
+					 * across namespaces in the futur.
+					 */
+					if (wait_node->app->pid ==
+							ust_cmd->reg_msg.pid) {
+						if ((wait_node->app->v_major !=
+								    ust_cmd->reg_msg.major) &&
+								(wait_node->app->v_minor !=
+										ust_cmd->reg_msg.minor)) {
+							DBG("Skipping notify socket assignment (pid: %d) based on version mismatch. Notify socket registration version %d.%d, under iteration app version %d.%d.",
+									wait_node->app->pid,
+									ust_cmd->reg_msg.major,
+									ust_cmd->reg_msg.minor,
+									wait_node->app->v_major,
+									wait_node->app->v_minor);
+							continue;
+						}
 						wait_node->app->notify_sock = ust_cmd->sock;
 						cds_list_del(&wait_node->head);
 						wait_queue.count--;
 						app = wait_node->app;
 						free(wait_node);
 						wait_node = NULL;
-						DBG3("UST app notify socket %d is set", ust_cmd->sock);
+						DBG3("UST app notify socket %d is set for app sock %d", ust_cmd->sock, app->sock);
 						break;
 					}
 				}

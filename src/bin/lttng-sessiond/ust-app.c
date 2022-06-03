@@ -4051,10 +4051,13 @@ void ust_app_add(struct ust_app *app)
 	rcu_read_lock();
 
 	/*
-	 * On a re-registration, we want to kick out the previous registration of
-	 * that pid
+	 * Accept duplicate pid to accommodate the possibility of multiple
+	 * lttng-ust per process. Both lttng-ust instance will register
+	 * themselves and be unique in term of socket.
+	 * All operations on pid should expects that multiple "app" be present
+	 * with the same pid.
 	 */
-	lttng_ht_add_replace_ulong(ust_app_ht, &app->pid_n);
+	lttng_ht_add_ulong(ust_app_ht, &app->pid_n);
 
 	/*
 	 * The socket _should_ be unique until _we_ call close. So, a add_unique
@@ -4328,17 +4331,9 @@ void ust_app_unregister(int sock)
 	iter.iter.node = &lta->notify_sock_n.node;
 	(void) lttng_ht_del(ust_app_ht_by_notify_sock, &iter);
 
-	/*
-	 * Ignore return value since the node might have been removed before by an
-	 * add replace during app registration because the PID can be reassigned by
-	 * the OS.
-	 */
 	iter.iter.node = &lta->pid_n.node;
 	ret = lttng_ht_del(ust_app_ht, &iter);
-	if (ret) {
-		DBG3("Unregister app by PID %d failed. This can happen on pid reuse",
-				lta->pid);
-	}
+	assert(!ret);
 
 	/* Free memory */
 	call_rcu(&lta->pid_n.head, delete_ust_app_rcu);
