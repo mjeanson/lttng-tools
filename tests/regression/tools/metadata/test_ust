@@ -229,7 +229,14 @@ LTTNG_HOME="$TRACE_PATH"
 export LTTNG_HOME
 start_lttng_sessiond
 
-tests=( test_per_uid test_per_pid )
+# test_per_pid is invalid since the session_id (monotonic) is suffixed to the
+# path for to support multi-ust instance for a given pid and it is not
+# available in the env. Note that if we want
+# to upstream the support of multi-ust, we will need the figure out a way to
+# comply with the requirement of the readers.
+
+#tests=( test_per_uid test_per_pid )
+tests=( test_per_uid )
 
 for fct_test in "${tests[@]}";
 do

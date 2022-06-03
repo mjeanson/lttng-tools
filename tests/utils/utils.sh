@@ -2527,7 +2527,7 @@ function validate_trace_path_ust_pid ()
 		session_name="$session_name-$date_time_pattern"
 	fi
 
-	pattern="$trace_path/$session_name/ust/pid/$pid/$app_string-*-$date_time_pattern/metadata"
+	pattern="$trace_path/$session_name/ust/pid/$pid/$app_string-*-$date_time_pattern-*/metadata"
 
 	validate_path_pattern "UST per-pid trace path is valid" "$pattern" "$trace_path"
 }
