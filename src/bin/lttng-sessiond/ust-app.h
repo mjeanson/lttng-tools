@@ -362,7 +362,7 @@ void ust_app_global_update_all_event_notifier_rules(void);
 
 void ust_app_clean_list(void);
 int ust_app_ht_alloc(void);
-struct ust_app *ust_app_find_by_pid(pid_t pid);
+bool ust_app_with_pid_exists(pid_t pid);
 struct ust_app_stream *ust_app_alloc_stream(void);
 int ust_app_recv_registration(int sock, struct ust_register_msg *msg);
 int ust_app_recv_notify(int sock);
@@ -614,9 +614,9 @@ struct ust_app *ust_app_find_by_sock(int sock)
 	return NULL;
 }
 static inline
-struct ust_app *ust_app_find_by_pid(pid_t pid)
+bool ust_app_with_pid_exists(pid_t pid)
 {
-	return NULL;
+	return false;
 }
 static inline
 uint64_t ust_app_get_size_one_more_packet_per_stream(

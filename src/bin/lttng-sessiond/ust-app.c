@@ -3910,28 +3910,25 @@ error:
 }
 
 /*
- * Return ust app pointer or NULL if not found. RCU read side lock MUST be
+ * Check if a ust_app with a given pid is present. RCU read side lock MUST be
  * acquired before calling this function.
  */
-struct ust_app *ust_app_find_by_pid(pid_t pid)
+bool ust_app_with_pid_exists(pid_t pid)
 {
-	struct ust_app *app = NULL;
 	struct lttng_ht_node_ulong *node;
 	struct lttng_ht_iter iter;
+	bool present = false;
 
 	lttng_ht_lookup(ust_app_ht, (void *)((unsigned long) pid), &iter);
 	node = lttng_ht_iter_get_node_ulong(&iter);
 	if (node == NULL) {
-		DBG2("UST app no found with pid %d", pid);
-		goto error;
+		DBG2("UST app not found with pid %d", pid);
+		goto end;
 	}
 
-	DBG2("Found UST app by pid %d", pid);
-
-	app = caa_container_of(node, struct ust_app, pid_n);
-
-error:
-	return app;
+	present = true;
+end:
+	return present;
 }
 
 /*
