@@ -6,6 +6,7 @@
  */
 
 #include <lttng/lttng-export.h>
+#include <urcu/tls-compat.h>
 
 #include <stddef.h>
 
@@ -55,7 +56,11 @@ struct log_time {
 	char str[19];
 };
 
+#ifdef CONFIG_RCU_TLS
 LTTNG_EXPORT thread_local struct log_time error_log_time = {};
+#else
+LTTNG_EXPORT const struct log_time *__tls_access_error_log_time = nullptr;
+#endif
 
 #ifdef __cplusplus
 }
